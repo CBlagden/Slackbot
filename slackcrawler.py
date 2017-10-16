@@ -7,16 +7,17 @@ from chatterbot import ChatBot
 from threading import Thread
 import random
 import re
+import markovify
 
 api_key_trinity_corp = 'xoxp-190294483460-190341461781-243885747221-95d8dc8567cd2cd79ec4050e8e1047ee'
-api_key_3309 = 'xoxp-3278486248-78952291655-243217296100-1016975c2c9f1f22db6c6a9af2100cdc'
+api_key_3309 = ''
 short_id = 'G6U7J132N'
 tall_id = 'G71E8F0SW'
 test_id = 'G767P9MKR'
 lines = [line.rstrip('\n') for line in open('data.txt', 'r', encoding='utf-8')]
 
 
-class Bot:
+class ChatterBot:
     def __init__(self):
         self.bot = ChatBot('Liz',
                            storage_adapter='chatterbot.storage.SQLStorageAdapter',
@@ -42,10 +43,23 @@ class Bot:
             return 'Exception, bot interrupted'
 
 
+class MarkovBot:
+
+    def __init__(self):
+        text = open('data.txt', 'r', encoding='utf-8').read()
+        self.text_model = markovify.Text(text)
+
+    def train_bot(self):
+        self.__init__()
+
+    def run_bot(self, text):
+        return self.text_model.make_sentence(max_words=25)
+
+
 class SlackCrawler(Thread):
     def __init__(self, api_key, session, name):
         super(SlackCrawler, self).__init__()
-        self.bot = Bot()
+        self.bot = MarkovBot()
         self.name = name
         self._is_running = True
         self.slack = Slacker(api_key, session=session)
@@ -54,7 +68,7 @@ class SlackCrawler(Thread):
             if id_group['name'] is not 'tall':
                 self.ids.append([id_group['id'], False, id_group['name']])
         for id_channel in self.slack.channels.list(exclude_archived=False).body['channels']:
-            self.ids.append([id_channel['id'], True, id_group['name']])
+            self.ids.append([id_channel['id'], True, id_channel['name']])
 
     def post_message(self, mess, channel_name):
         try:
@@ -85,7 +99,7 @@ class SlackCrawler(Thread):
     def stop(self):
         self._is_running = False
 
-    def write_data(self, count=50):
+    def write_data(self, count=1000):
         a = 0
         print('opening file')
         file = open("data.txt", "w", encoding="utf-8")
@@ -113,7 +127,7 @@ class SlackCrawler(Thread):
                                     text = l['text']
                                     print(text)
                                     if 'no_text' not in text:
-                                        if '--pause ' + self.name in text:
+                                        if self.name + ' --pause' in text:
                                             self.post_message('ending bot ' + self.name, id[0])
                                             read = False
                                         elif '--pause all' in text:
@@ -126,21 +140,26 @@ class SlackCrawler(Thread):
                                             post = True
                                     else:
                                         self.post_message('no text detected', id[0])
-                    elif '--crawl ' + self.name in j['text']:
+                    elif self.name + ' --crawl' in j['text']:
                         self.post_message('training bot ' + self.name, id[0])
-                        self.write_data(count=int(re.findall('\d+', j['text'])[0]))
+                        try:
+                            count = int(re.findall('\d+', j['text'])[0])
+                        except IndexError as e:
+                            print(e)
+                            count = 1000
+                        self.write_data(count=count)
                         self.bot.train_bot()
                         self.post_message(self.name + ' finished training', id[0])
                     elif '--spawn' in j['text']:
                         with Session() as sess:
-                            name = str(j['text']).strip('--spawn ')
+                            name = str(j['text']).strip(' --spawn')
                             new_bot = SlackCrawler(api_key_3309, sess, name)
                             new_bot.post_message('new bot active from ' + name, id[0])
                             new_bot.start()
-                    elif '--kill ' + self.name in j['text']:
+                    elif self.name + ' --kill' in j['text']:
                         self.post_message('killing bot ' + self.name, id[0])
                         self.stop()
-                    elif '--test ' + self.name in j['text']:
+                    elif self.name + ' --test' in j['text']:
                         self.post_message('bot ' + self.name + ' is still running', id[0])
                     elif '--test all' in j['text']:
                         self.post_message('bot ' + self.name + ' active', id[0])
@@ -152,6 +171,7 @@ class SlackCrawler(Thread):
                         pass
 
     def run(self):
+        self.post_message(self.name + ' is active', test_id)
         while self._is_running:
             self.respond_mess()
             time.sleep(20)
