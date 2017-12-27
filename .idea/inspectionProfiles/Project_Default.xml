@@ -1,6 +1,16 @@
 <component name="InspectionProjectProfileManager">
   <profile version="1.0">
     <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="2">
+            <item index="0" class="java.lang.String" itemvalue="re" />
+            <item index="1" class="java.lang.String" itemvalue="slackbot" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
     <inspection_tool class="PyPep8Inspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
       <option name="ignoredErrors">
         <list>
@@ -24,6 +34,7 @@
       <option name="ignoredIdentifiers">
         <list>
           <option value="seq2seq_model" />
+          <option value="slackbot.main.has_bot_started" />
         </list>
       </option>
     </inspection_tool>
